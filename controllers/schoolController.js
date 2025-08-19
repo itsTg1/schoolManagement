@@ -1,13 +1,14 @@
-const pool = require("../config/db");
+const { getPool } = require("../config/db");
 
 const isNonEmptyString = (v) => typeof v === "string" && v.trim().length > 0;
 const toNumber = (v) => (v === 0 || v === "0" ? 0 : Number(v));
 const isValidLat = (n) => Number.isFinite(n) && n >= -90 && n <= 90;
 const isValidLng = (n) => Number.isFinite(n) && n >= -180 && n <= 180;
 
-// Add School
 exports.addSchool = async (req, res) => {
   try {
+    const pool = getPool();
+
     const { name, address, latitude, longitude } = req.body || {};
 
     if (!isNonEmptyString(name))
@@ -17,6 +18,15 @@ exports.addSchool = async (req, res) => {
 
     const lat = toNumber(latitude);
     const lng = toNumber(longitude);
+
+    const [existing] = await pool.execute(
+      `SELECT id FROM schools WHERE name = ? AND address = ?`,
+      [name.trim(), address.trim()]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "School already exists" });
+    }
 
     if (!isValidLat(lat))
       return res
@@ -44,9 +54,10 @@ exports.addSchool = async (req, res) => {
   }
 };
 
-// List Schools
 exports.listSchools = async (req, res) => {
   try {
+    const pool = getPool();
+
     const lat = toNumber(req.query.lat);
     const lng = toNumber(req.query.lng);
 

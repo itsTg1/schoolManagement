@@ -1,33 +1,28 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
+const url = require("url");
+
+let pool;
 
 async function initDb() {
+  if (pool) return pool;
+
   try {
-    
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-    });
+    const dbUrl = process.env.DATABASE_URL;
+    const { hostname, port, username, password, pathname } = new url.URL(dbUrl);
 
-    await connection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\`;`
-    );
-    await connection.end();
-
-    
-    const pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+    pool = mysql.createPool({
+      host: hostname,
+      port: port,
+      user: username,
+      password: password,
+      database: pathname.replace("/", ""),
       waitForConnections: true,
       connectionLimit: Number(process.env.DB_CONN_LIMIT || 10),
       queueLimit: 0,
     });
 
-    
-    const createTableQuery = `
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS schools (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(255) NOT NULL,
@@ -37,16 +32,14 @@ async function initDb() {
         PRIMARY KEY (id),
         INDEX idx_lat_lng (latitude, longitude)
       );
-    `;
-    await pool.query(createTableQuery);
+    `);
 
-    console.log("Database and table initialized");
+    console.log("Connected to Railway DB & ensured table");
     return pool;
   } catch (err) {
-    console.error("DB Init Error:", err);
+    console.error("MySQL Init Error:", err);
     process.exit(1);
   }
 }
 
-
-module.exports = initDb();
+module.exports = { initDb, getPool: () => pool };
